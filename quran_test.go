@@ -20,3 +20,7 @@ func TestGetVerse(t *testing.T) {
 	}
 	t.Log(ar)
 }
+
+func TestSelect(t *testing.T) {
+	Select(Filters{Chapter: 3, Verse: 55}, Options{Langs: []string{"hi", "ur"}})
+}

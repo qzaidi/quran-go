@@ -9,6 +9,16 @@ import (
 
 var db *sql.DB
 
+// TODO: Implement validation for invalid chapter and verse numbers
+type Filters struct {
+	Chapter int // chapter selector
+	Verse   int // verse selector
+}
+
+type Options struct {
+	Langs []string
+}
+
 func init() {
 	var err error
 	db, err = sql.Open("sqlite3", "./data/qurandb")
@@ -62,4 +72,56 @@ func GetVerse(chapter, verse int) (string, error) {
 
 	log.Println(chapter, verse, arabic)
 	return arabic, nil
+}
+
+func Select(filters Filters, options Options) {
+	chapter := filters.Chapter
+	verse := filters.Verse
+
+	j := " "
+	f := "ar"
+
+	for _, lang := range options.Langs {
+		f += "," + lang
+		j += "join " + lang + " using (chapter,verse)"
+	}
+
+	q := "select " + f + " from ar a" + j + "  where chapter = ? and verse = ? order by chapter,verse"
+
+	log.Println("query:", q)
+
+	stmt, err := db.Prepare(q)
+	if err != nil {
+		log.Println("prepare:", err, q)
+		return
+	}
+
+	defer stmt.Close()
+
+	rows, err := stmt.Query(chapter, verse)
+	if err != nil {
+		log.Println("query:", err, q)
+		return
+	}
+
+	defer rows.Close()
+
+	cols, _ := rows.Columns()
+
+	data := make([]interface{}, len(cols))
+	for idx := range cols {
+		data[idx] = new(string)
+	}
+
+	for rows.Next() {
+		err = rows.Scan(data...)
+		if err != nil {
+			log.Println("scan:", err)
+			return
+		}
+		for idx := range cols {
+			str := data[idx].(*string)
+			log.Println(*str)
+		}
+	}
 }
