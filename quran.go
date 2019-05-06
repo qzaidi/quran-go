@@ -8,22 +8,18 @@ import (
 )
 
 var db *sql.DB
-
-// TODO: Implement validation for invalid chapter and verse numbers
-type Filters struct {
-	Chapter int // chapter selector
-	Verse   int // verse selector
-}
-
-type Options struct {
-	Langs []string
-}
+var langs []string
 
 func init() {
 	var err error
 	db, err = sql.Open("sqlite3", "./data/qurandb")
 	if err != nil {
 		log.Fatal("unable to open qurandb", err)
+	}
+
+	langs, err = AvailableLangs()
+	if err != nil {
+		log.Fatal("failed to fetch available languages from db\n")
 	}
 }
 
@@ -74,7 +70,31 @@ func GetVerse(chapter, verse int) (string, error) {
 	return arabic, nil
 }
 
-func Select(filters Filters, options Options) {
+// Get Metadata for a given chapter
+func Chapter(chapter int) (*ChapterMeta, error) {
+
+	var c ChapterMeta
+	q := "select * from chapters where id = ?"
+
+	stmt, err := db.Prepare(q)
+	if err != nil {
+		log.Println("prepare:", err, q)
+		return nil, err
+	}
+
+	defer stmt.Close()
+
+	err = stmt.QueryRow(chapter).Scan(&c.Start, &c.Ayas, &c.Ord, &c.Rukus, &c.Arname, &c.Tname, &c.Enname, &c.Text, &c.Id)
+	if err != nil {
+		log.Println("scan:", err)
+		return nil, err
+	}
+
+	return &c, nil
+
+}
+
+func Select(filters Filters, options Options) ([]Verse, error) {
 	chapter := filters.Chapter
 	verse := filters.Verse
 
@@ -93,7 +113,7 @@ func Select(filters Filters, options Options) {
 	stmt, err := db.Prepare(q)
 	if err != nil {
 		log.Println("prepare:", err, q)
-		return
+		return nil, err
 	}
 
 	defer stmt.Close()
@@ -101,7 +121,7 @@ func Select(filters Filters, options Options) {
 	rows, err := stmt.Query(chapter, verse)
 	if err != nil {
 		log.Println("query:", err, q)
-		return
+		return nil, err
 	}
 
 	defer rows.Close()
@@ -113,15 +133,22 @@ func Select(filters Filters, options Options) {
 		data[idx] = new(string)
 	}
 
+	var verses []Verse
+
 	for rows.Next() {
+		verse := make(Verse)
 		err = rows.Scan(data...)
 		if err != nil {
 			log.Println("scan:", err)
-			return
+			return nil, err
 		}
 		for idx := range cols {
 			str := data[idx].(*string)
-			log.Println(*str)
+			//log.Println(*str)
+			verse[cols[idx]] = *str
 		}
+		log.Println(verse)
+		verses = append(verses, verse)
 	}
+	return verses, nil
 }
