@@ -1,5 +1,9 @@
 package quran
 
+import (
+	"errors"
+)
+
 // TODO: Implement validation for invalid chapter and verse numbers
 type Filters struct {
 	Chapter int // chapter selector
@@ -23,3 +27,7 @@ type ChapterMeta struct {
 }
 
 type Verse map[string]string
+
+var (
+	ErrNotFound = errors.New("Not Found")
+)

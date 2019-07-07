@@ -1,25 +1,37 @@
+// package quran provides go interface to Al-Quran and its translations.
 package quran
 
 import (
 	"database/sql"
 	"log"
+	"os"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 var db *sql.DB
-var langs []string
+var langMap map[string]bool
 
 func init() {
+	Init(os.Getenv("GOPATH") + "/src/github.com/qzaidi/quran-go/data")
+}
+
+func Init(cacheDir string) {
 	var err error
-	db, err = sql.Open("sqlite3", "./data/qurandb")
+	log.Println("looking for db in", cacheDir)
+	db, err = sql.Open("sqlite3", cacheDir+"/qurandb")
 	if err != nil {
 		log.Fatal("unable to open qurandb", err)
+		// TODO: we will download qurandb in the cacheDir on the first run if it doesn't exist
 	}
 
-	langs, err = AvailableLangs()
+	langs, err := AvailableLangs()
 	if err != nil {
 		log.Fatal("failed to fetch available languages from db\n")
+	}
+	langMap = make(map[string]bool)
+	for _, lang := range langs {
+		langMap[lang] = true
 	}
 }
 
@@ -38,11 +50,9 @@ func AvailableLangs() ([]string, error) {
 	for rows.Next() {
 		rows.Scan(&tableName)
 		if err != nil {
-			log.Println(err)
 			return result, err
 		}
 
-		log.Println(tableName)
 		if tableName != "chapters" && tableName != "juz" {
 			result = append(result, tableName)
 		}
@@ -73,6 +83,10 @@ func GetVerse(chapter, verse int) (string, error) {
 // Get Metadata for a given chapter
 func Chapter(chapter int) (*ChapterMeta, error) {
 
+	if chapter < 0 || chapter > 114 {
+		return nil, ErrNotFound
+	}
+
 	var c ChapterMeta
 	q := "select * from chapters where id = ?"
 
@@ -102,8 +116,12 @@ func Select(filters Filters, options Options) ([]Verse, error) {
 	f := "ar"
 
 	for _, lang := range options.Langs {
-		f += "," + lang
-		j += "join " + lang + " using (chapter,verse)"
+		if langMap[lang] {
+			f += "," + lang
+			j += "join " + lang + " using (chapter,verse)"
+		} else {
+			log.Println("unsupported language", lang)
+		}
 	}
 
 	q := "select " + f + " from ar a" + j + "  where chapter = ? and verse = ? order by chapter,verse"
@@ -144,10 +162,8 @@ func Select(filters Filters, options Options) ([]Verse, error) {
 		}
 		for idx := range cols {
 			str := data[idx].(*string)
-			//log.Println(*str)
 			verse[cols[idx]] = *str
 		}
-		log.Println(verse)
 		verses = append(verses, verse)
 	}
 	return verses, nil

@@ -11,7 +11,15 @@ func TestChapter(t *testing.T) {
 	}
 
 	t.Log(c)
+}
 
+func TestChapterInvalid(t *testing.T) {
+	c, err := Chapter(115)
+	if err == nil {
+		t.Error("expected error, got none")
+	}
+
+	t.Log(c, err)
 }
 
 func TestAvailableLangs(t *testing.T) {
@@ -32,7 +40,7 @@ func TestGetVerse(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
-	verses, err := Select(Filters{Chapter: 3, Verse: 55}, Options{Langs: []string{"hi", "ur"}})
+	verses, err := Select(Filters{Chapter: 3, Verse: 55}, Options{Langs: []string{"hi", "ur", "id"}})
 	if err != nil {
 		t.Error(err)
 	}
